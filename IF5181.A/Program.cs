@@ -10,7 +10,7 @@ namespace IF5181.A
     {
         static void Main(string[] args)
         {
-            Tree tree = null;
+            Tree tree = new Tree();
             Console.Write("Input  : ");
             var command = Console.ReadLine().Split(' ');
 
@@ -20,36 +20,43 @@ namespace IF5181.A
 
                 if (command[0] == "add")
                 {
-                    if (tree == null)
+                    if (command.Length == 2)
                     {
-                        tree = new Tree(command[1]);
-                        Console.WriteLine(string.Format("Word '{0}' added successfully", command[1]));
+                        if (tree.Add(command[1]))
+                        {
+                            Console.WriteLine(string.Format("Word '{0}' added successfully", command[1]));
+                        }
+                        else
+                        {
+                            Console.WriteLine(string.Format("Word '{0}' already exist", command[1]));
+                        }
                     }
                     else
                     {
-                        if (tree.Add(command[1]))
-                            Console.WriteLine(string.Format("Word '{0}' added successfully", command[1]));
-                        else
-                            Console.WriteLine(string.Format("Word '{0}' already exist", command[1]));
+                        Console.WriteLine("Wrong command");
                     }
                 }
                 else if (command[0] == "search")
                 {
-                    if (tree == null)
+                    if (command.Length == 2)
                     {
-                        Console.WriteLine(string.Format("Word '{0}' is not found", command[1]));
+                        if (tree.Search(command[1]))
+                        {
+                            Console.WriteLine(string.Format("Word '{0}' found", command[1]));
+                        }
+                        else
+                        {
+                            Console.WriteLine(string.Format("Word '{0}' is not found", command[1]));
+                        }
                     }
                     else
                     {
-                        if (tree.Search(command[1]))
-                            Console.WriteLine(string.Format("Word '{0}' found", command[1]));
-                        else
-                            Console.WriteLine(string.Format("Word '{0}' is not found", command[1]));
+                        Console.WriteLine("Wrong command");
                     }
                 }
                 else if (command[0] == "print")
                 {
-                    if (tree == null)
+                    if (tree.IsEmpty())
                     {
                         Console.WriteLine("Empty Tree");
                     }
