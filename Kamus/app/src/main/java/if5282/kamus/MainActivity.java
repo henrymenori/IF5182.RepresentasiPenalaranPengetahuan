@@ -9,19 +9,26 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import if5282.kamus.util.Dict;
 import if5282.kamus.util.Parser;
+import if5282.kamus.util.Stemmer;
 import if5282.kamus.util.Tree;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
     private EditText editText;
     private TextView textView, debug;
+    private Spinner spinner;
     private Dict dict;
     private StringBuilder sb;
+    private int language;
+    private String input;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,6 +44,8 @@ public class MainActivity extends AppCompatActivity {
         editText = findViewById(R.id.editText);
         textView = findViewById(R.id.textView);
         debug = findViewById(R.id.debug);
+        spinner = findViewById(R.id.spinner);
+        input = "";
 
         editText.addTextChangedListener(new TextWatcher() {
             @Override
@@ -46,10 +55,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
+                input = s.toString();
                 sb = new StringBuilder();
-                sb.append(dict.validate(s.toString()) ? "valid" : "invalid");
+                sb.append(dict.validate(input) ? "valid" : "invalid");
                 sb.append('\n');
-                sb.append(dict.validate2(s.toString()));
+                sb.append(dict.validate2(input));
+                sb.append('\n');
+                sb.append(dict.translate(input, language));
                 textView.setText(sb);
             }
 
@@ -59,12 +71,35 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item
+                , new String[]{"Indonesia", "Jawa", "Sunda", "Minang"});
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setOnItemSelectedListener(this);
+
         dict = new Dict();
-        dict.load("dict4.txt");
+        dict.load("dict3.txt");
     }
 
     public void build(View view) {
         dict.build("dict4.txt", "link2.txt");
         dict.save();
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        language = position;
+        sb = new StringBuilder();
+        sb.append(dict.validate(input) ? "valid" : "invalid");
+        sb.append('\n');
+        sb.append(dict.validate2(input));
+        sb.append('\n');
+        sb.append(dict.translate(input, language));
+        textView.setText(sb);
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+
     }
 }

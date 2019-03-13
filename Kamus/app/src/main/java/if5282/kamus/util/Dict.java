@@ -184,9 +184,11 @@ public class Dict {
         String[] words = s.split(" ");
         StringBuilder sb = new StringBuilder();
         Parser parser = new Parser();
+        int type;
 
         for (int i = 0; i < words.length; i++) {
-            sb.append(getTypeString(trees[0].searchType(words[i])));
+            type = trees[0].searchType(words[i]);
+            sb.append(type == 0 ? Stemmer.getType(words[i]) : getTypeString(type));
             sb.append(' ');
         }
 
@@ -197,6 +199,26 @@ public class Dict {
         } catch (Exception e) {
             e.printStackTrace();
             sb.append("invalid");
+        }
+
+        return sb;
+    }
+
+    public StringBuilder translate(String s, int language) {
+        StringBuilder sb = new StringBuilder();
+        String[] words = s.split(" ");
+        int idx;
+
+        for (String word : words) {
+            idx = trees[0].search(word);
+
+            if (idx != 0) {
+                sb.append(table[trees[0].getValue(idx) - 1][language]);
+            } else {
+                sb.append(word);
+            }
+
+            sb.append(" ");
         }
 
         return sb;
