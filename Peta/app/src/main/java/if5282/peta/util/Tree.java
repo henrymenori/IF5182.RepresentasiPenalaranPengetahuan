@@ -1,17 +1,33 @@
 package if5282.peta.util;
 
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Stack;
 
 public class Tree {
 
     // ==== Constant ====
 
     private static final int INITIAL_SIZE = 250;
+    private static final int MAX_BRANCH = 5;
+    private static final int MAX_EXPN = 4;
     private static final int NULL_INDEX = 0;
 
     // ==== Property ====
 
     private byte[] data;
+    private double xmin;
+    private double xmax;
+    private double ymin;
+    private double ymax;
+    private Stack<Integer> path;
+    private Stack<Integer> stop;
+    private int s_idx;
+    private int d_idx;
 
     // ==== Constructor ====
 
@@ -22,6 +38,10 @@ public class Tree {
         setSize(INITIAL_SIZE);
         setCurr(4);
         setRoot(NULL_INDEX);
+
+        path = new Stack<>();
+        stop = new Stack<>();
+        xmin = xmax = ymin = ymax = 0;
     }
 
     public Tree(int expn, int size) {
@@ -31,6 +51,9 @@ public class Tree {
         setSize(size);
         setCurr(1 + 3 * expn);
         setRoot(NULL_INDEX);
+
+        path = new Stack<>();
+        stop = new Stack<>();
     }
 
     // ==== Getter & Setter ====
@@ -171,39 +194,43 @@ public class Tree {
     }
 
     private boolean rescale(int expn_b) {
+        if (expn_b > MAX_EXPN) {
+            return false;
+        }
+
         int expn_a = getExpn();
         int curr_a = getCurr();
         int curr_b = getScaledIndex(curr_a, expn_a, expn_b);
 
         if (curr_b > getMaxIndex(expn_b)) {
             return false;
-        } else {
-            Tree t = new Tree(expn_b, curr_b);
-            t.setCurr(curr_b);
-            t.setRoot(getScaledIndex(getRoot(), expn_a, expn_b));
+        }
 
-            int b_idx;
-            int i = getHeaderSize(expn_a);
-            int j = getHeaderSize(expn_b);
-            int bsize_a = getBlockSize(expn_a);
-            int bsize_b = getBlockSize(expn_b);
+        Tree t = new Tree(expn_b, curr_b);
+        t.setCurr(curr_b);
+        t.setRoot(getScaledIndex(getRoot(), expn_a, expn_b));
 
-            for (; i < curr_a; i += bsize_a) {
-                t.setValueX(j, getValueX(i));
-                t.setValueY(j, getValueY(i));
+        int b_idx;
+        int i = getHeaderSize(expn_a);
+        int j = getHeaderSize(expn_b);
+        int bsize_a = getBlockSize(expn_a);
+        int bsize_b = getBlockSize(expn_b);
 
-                for (int k = 0; k < 5; k++) {
-                    b_idx = getBranchIndex(i, k);
-                    t.setBranchIndex(j, k, b_idx == NULL_INDEX ? NULL_INDEX : getScaledIndex(b_idx, expn_a, expn_b));
-                }
+        for (; i < curr_a; i += bsize_a) {
+            t.setValueX(j, getValueX(i));
+            t.setValueY(j, getValueY(i));
 
-                j += bsize_b;
+            for (int k = 0; k < 5; k++) {
+                b_idx = getBranchIndex(i, k);
+                t.setBranchIndex(j, k, b_idx == NULL_INDEX ? NULL_INDEX : getScaledIndex(b_idx, expn_a, expn_b));
             }
 
-            this.data = t.data;
-
-            return true;
+            j += bsize_b;
         }
+
+        this.data = t.data;
+
+        return true;
     }
 
     private boolean resize(int size) {
@@ -220,59 +247,84 @@ public class Tree {
         }
     }
 
-    private int addNode(double valX, double valY, int branch_count, int[] names, int[] idxs) {
+    private void addNode(double valX, double valY) {
         int n_idx = getCurr();
-        int expn = getExpn();
-        int header_size = getHeaderSize(expn);
-        int block_size = getBlockSize(expn);
 
         setValueX(n_idx, valX);
         setValueY(n_idx, valY);
-        setBranchCount(n_idx, branch_count);
+        setBranchCount(n_idx, 0);
+        setCurr(n_idx + getBlockSize(getExpn()));
 
-        for (int i = 0; i < names.length; i++) {
-            setBranchName(n_idx, i, names[i] - 1);
-            setBranchIndex(n_idx, i, header_size + (idxs[i] - 1) * block_size);
-        }
-
-        setCurr(n_idx + block_size);
-
-        return n_idx;
+        if (valX < xmin || xmin == 0) xmin = valX;
+        if (valX > xmax || xmax == 0) xmax = valX;
+        if (valY < ymin || ymin == 0) ymin = valY;
+        if (valY > ymax || ymax == 0) ymax = valY;
     }
 
     // ==== Main Method ====
 
-    public boolean insert(double valX, double valY, int branch_count, int[] names, int[] idxs) {
-        int t_idx;
+    public boolean insertIntersection(double valX, double valY) {
+        int expn = getExpn();
 
         if (isEmpty()) {
-            t_idx = addNode(valX, valY, branch_count, names, idxs);
-            setRoot(t_idx);
+            addNode(valX, valY);
+            setRoot(getHeaderSize(expn));
 
             return true;
         } else {
             int size = getSize();
-            int expn = getExpn();
 
-            while (getCurr() + getBlockSize(expn) > size) {
+            if (getCurr() + getBlockSize(expn) > size) {
                 size *= 2;
-            }
 
-            if (size > getSize()) {
-                if (size > getMaxIndex(expn)) {
-                    rescale(expn + 1);
+                if (size > getMaxIndex(expn) && !rescale(expn + 1)) {
+                    return false;
                 }
 
-                resize(size);
+                if (!resize(size)) {
+                    return false;
+                }
             }
 
-            addNode(valX, valY, branch_count, names, idxs);
+            addNode(valX, valY);
 
             return true;
         }
     }
 
-    public StringBuilder printMemory(String[] names) {
+    public boolean insertLink(int a, int b, boolean directed, int name) {
+        int expn = getExpn();
+        int header_size = getHeaderSize(expn);
+        int block_size = getBlockSize(expn);
+        int a_idx = header_size + a * block_size;
+        int b_idx = header_size + b * block_size;
+        int a_count = getBranchCount(a_idx);
+        int b_count = getBranchCount(b_idx);
+
+        if (!(a_count < MAX_BRANCH)) {
+            return false;
+        }
+
+        setBranchIndex(a_idx, a_count, b_idx);
+        setBranchName(a_idx, a_count, name);
+        setBranchCount(a_idx, a_count + 1);
+
+        if (!directed) {
+            if (!(b_count < MAX_BRANCH)) {
+                return false;
+            }
+
+            setBranchIndex(b_idx, b_count, a_idx);
+            setBranchName(b_idx, b_count, name);
+            setBranchCount(b_idx, b_count + 1);
+        }
+
+        return true;
+    }
+
+    // ==== Print Method ====
+
+    public StringBuilder printMemory(ArrayList<String> names) {
         StringBuilder sb = new StringBuilder();
         int expn = getExpn();
 
@@ -286,10 +338,116 @@ public class Tree {
             sb.append(String.format(" %05d | %.6f | %.6f | %d\r\n", i, getValueX(i), getValueY(i), getBranchCount(i)));
 
             for (int j = 0; j < getBranchCount(i); j++) {
-                sb.append(String.format("\t%05d - %s\r\n", getBranchIndex(i, j), names[getBranchName(i, j)]));
+                sb.append(String.format("\t%05d - %s\r\n", getBranchIndex(i, j), names.get(getBranchName(i, j))));
             }
         }
 
         return sb;
+    }
+
+    // ==== Navigation Method ====
+
+    public void initNavigation(int src, int dst) {
+        path.clear();
+        stop.clear();
+
+        s_idx = getHeaderSize(getExpn()) + src * getBlockSize(getExpn());
+        d_idx = getHeaderSize(getExpn()) + dst * getBlockSize(getExpn());
+
+        path.push(s_idx);
+    }
+
+    public int navigateStep() {
+        double distance = Double.MAX_VALUE;
+        int n_idx = path.peek();
+        int m_idx = NULL_INDEX;
+        int t_idx;
+
+        if (n_idx != d_idx) {
+            for (int i = 0; i < getBranchCount(n_idx); i++) {
+                t_idx = getBranchIndex(n_idx, i);
+
+                if (!path.contains(t_idx) && !stop.contains(t_idx) && distance > getDistance(t_idx, d_idx)) {
+                    distance = getDistance(t_idx, d_idx);
+                    m_idx = t_idx;
+                }
+            }
+
+            if (m_idx == NULL_INDEX) {
+                if (n_idx == s_idx) {
+                    return -1;
+                } else {
+                    stop.push(n_idx);
+                    path.pop();
+                    return 0;
+                }
+            } else {
+                path.push(m_idx);
+                return 0;
+            }
+        } else {
+            return 1;
+        }
+    }
+
+    // ==== Drawing Method ====
+
+    public void drawMap(Canvas canvas, int width, int height, Paint paint) {
+        double w_ratio = (double) width / (xmax - xmin) * 0.9;
+        double h_ratio = (double) height / (ymax - ymin) * 0.9;
+        double w_offset = width * 0.05;
+        double h_offset = height * 0.05;
+        float ax, ay, bx, by;
+        int count = 0;
+
+        for (int i = getHeaderSize(getExpn()); i < getCurr(); i += getBlockSize(getExpn())) {
+            ax = (float) ((getValueX(i) - xmin) * w_ratio + w_offset);
+            ay = (float) (height - (getValueY(i) - ymin) * h_ratio - h_offset);
+
+            for (int j = 0; j < getBranchCount(i); j++) {
+                bx = (float) ((getValueX(getBranchIndex(i, j)) - xmin) * w_ratio + w_offset);
+                by = (float) (height - (getValueY(getBranchIndex(i, j)) - ymin) * h_ratio - h_offset);
+
+                canvas.drawLine(ax, ay, bx, by, paint);
+            }
+
+            if (getBranchCount(i) > 0) {
+                canvas.drawCircle(ax, ay, 5, paint);
+                canvas.drawText("" + count, ax, ay - 10, paint);
+            }
+
+            count++;
+        }
+    }
+
+    public void drawPath(Canvas canvas, int width, int height, Paint paint) {
+        double w_ratio = (double) width / (xmax - xmin) * 0.9;
+        double h_ratio = (double) height / (ymax - ymin) * 0.9;
+        double w_offset = width * 0.05;
+        double h_offset = height * 0.05;
+        float ax, ay, bx, by;
+
+        paint.setColor(Color.BLUE);
+        paint.setStrokeWidth(3);
+
+        for (int i = 0; i < path.size() - 1; i++) {
+            ax = (float) ((getValueX(path.elementAt(i)) - xmin) * w_ratio + w_offset);
+            ay = (float) (height - (getValueY(path.elementAt(i)) - ymin) * h_ratio - h_offset);
+            bx = (float) ((getValueX(path.elementAt(i + 1)) - xmin) * w_ratio + w_offset);
+            by = (float) (height - (getValueY(path.elementAt(i + 1)) - ymin) * h_ratio - h_offset);
+
+            canvas.drawLine(ax, ay, bx, by, paint);
+        }
+    }
+
+    // ==== Other Function ====
+
+    private double getDistance(int a_idx, int b_idx) {
+        double ax = getValueX(a_idx);
+        double ay = getValueY(a_idx);
+        double bx = getValueX(b_idx);
+        double by = getValueY(b_idx);
+
+        return Math.sqrt(Math.pow(ax - bx, 2) + Math.pow(ay - by, 2));
     }
 }
